@@ -26,8 +26,8 @@ export default function Login() {
       // Simple auth: set a dummy token
       localStorage.setItem('authToken', 'dummy-token')
 
-      // Navigate to intended route or dashboard
-      const redirectTo = location.state?.from?.pathname ?? '/dashboard'
+      // Navigate to intended route or admin shell (so header/sidebar appear)
+      const redirectTo = location.state?.from?.pathname ?? '/admin'
       navigate(redirectTo, { replace: true })
     } catch {
       setError('Login gagal. Silakan coba lagi.')
