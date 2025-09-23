@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { PropsWithChildren } from 'react'
+import type { PropsWithChildren } from 'react'
 
 function isAuthenticated() {
   return Boolean(localStorage.getItem('authToken'))

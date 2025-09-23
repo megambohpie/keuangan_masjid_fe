@@ -1,16 +1,55 @@
-import daisyui from 'daisyui'
-
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ["class"],
   content: [
-    './index.html',
-    './src/**/*.{ts,tsx,js,jsx}',
+    "./index.html",
+    "./src/**/*.{ts,tsx,js,jsx}",
   ],
   theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
       colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
         islamic: {
-          50: '#f0fff4',
+          50: '#f0fdf4',
           100: '#dcfce7',
           200: '#bbf7d0',
           300: '#86efac',
@@ -22,29 +61,26 @@ export default {
           900: '#14532d',
         },
       },
-    },
-  },
-  plugins: [daisyui],
-  daisyui: {
-    themes: [
-      {
-        masjid: {
-          primary: '#22c55e', // light green
-          'primary-content': '#ffffff',
-          secondary: '#86efac',
-          accent: '#4ade80',
-          neutral: '#1f2937',
-          'base-100': '#ffffff',
-          'base-200': '#f3f4f6',
-          'base-300': '#e5e7eb',
-          info: '#38bdf8',
-          success: '#22c55e',
-          warning: '#f59e0b',
-          error: '#ef4444',
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
-      'emerald',
-      'light',
-    ],
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
   },
+  plugins: [require("tailwindcss-animate")],
 }
