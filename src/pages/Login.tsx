@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, type Location } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog'
+import { login as loginApi, extractUserName } from '@/api/auth'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -15,25 +17,46 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [successOpen, setSuccessOpen] = useState(false)
+  const [errorOpen, setErrorOpen] = useState(false)
+
+  // Jika sudah login (punya token), otomatis pindah ke dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('authToken')
+    if (token) {
+      const redirectTo = (location.state?.from?.pathname as string | undefined) ?? '/admin'
+      navigate(redirectTo, { replace: true })
+    }
+    // only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      // Simulate login request
-      await new Promise((r) => setTimeout(r, 1200))
+      const data = await loginApi({ email, password })
+      // Ambil nama dari response API (data.user.nama atau data.user.name)
+      const userName = extractUserName(data) || email?.split('@')[0] || 'Admin'
+      localStorage.setItem('userName', userName)
+      // Simpan user object jika tersedia untuk kebutuhan lain
+      const maybeUser = (data as unknown as Record<string, unknown>)?.data as Record<string, unknown> | undefined
+      if (maybeUser?.user && typeof maybeUser.user === 'object') {
+        localStorage.setItem('user', JSON.stringify(maybeUser.user))
+      }
 
-      // Simple auth: set a dummy token
-      localStorage.setItem('authToken', 'dummy-token')
-      // Save user name for header display
-      const guessedName = email?.split('@')[0] || 'Admin'
-      localStorage.setItem('userName', guessedName)
+      // Tampilkan dialog sukses sebentar lalu redirect
+      setSuccessOpen(true)
+      setTimeout(() => {
+        const redirectTo = location.state?.from?.pathname ?? '/admin'
+        navigate(redirectTo, { replace: true })
+      }, 400)
 
-      // Navigate to intended route or admin shell (so header/sidebar appear)
-      const redirectTo = location.state?.from?.pathname ?? '/admin'
-      navigate(redirectTo, { replace: true })
-    } catch {
-      setError('Login gagal. Silakan coba lagi.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login gagal. Silakan coba lagi.'
+      setError(msg)
+      setErrorOpen(true)
     } finally {
       setLoading(false)
     }
@@ -174,6 +197,34 @@ export default function Login() {
           </Card>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <Dialog open={successOpen} onOpenChange={setSuccessOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Berhasil Masuk</DialogTitle>
+            <DialogDescription>
+              Anda berhasil login. Mengarahkan ke dashboard...
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={errorOpen} onOpenChange={setErrorOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Gagal</DialogTitle>
+            <DialogDescription>
+              {error || 'Terjadi kesalahan pada proses login.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 text-right">
+            <DialogClose asChild>
+              <Button variant="outline">Tutup</Button>
+            </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

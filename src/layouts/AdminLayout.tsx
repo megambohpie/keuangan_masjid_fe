@@ -1,4 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom'
+import { logout as apiLogout } from '@/api/auth'
 import AppShell from '@/components/layout/app-shell'
 import type { AppHeaderProps } from '@/components/layout/app-header'
 import type { AppSidebarProps } from '@/components/layout/app-sidebar'
@@ -6,15 +7,36 @@ import type { AppSidebarProps } from '@/components/layout/app-sidebar'
 export default function AdminLayout() {
   const navigate = useNavigate()
 
-  const onLogout = () => {
-    localStorage.removeItem('authToken')
-    navigate('/login', { replace: true })
+  const onLogout = async () => {
+    try {
+      await apiLogout()
+    } catch {
+      // ignore API errors, proceed to local logout/redirect
+    } finally {
+      navigate('/login', { replace: true })
+    }
+  }
+
+  // Resolve display name: prefer stored user object (nama/name), fallback to userName
+  let displayName: string = 'Admin'
+  if (typeof window !== 'undefined') {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr) as { nama?: string; name?: string }
+        displayName = user?.nama || user?.name || displayName
+      } catch {
+        // ignore parse error
+      }
+    } else {
+      displayName = localStorage.getItem('userName') || displayName
+    }
   }
 
   const headerProps: AppHeaderProps = {
     title: '',
     onLogout: onLogout,
-    userName: (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Admin',
+    userName: displayName,
   }
 
   const sidebarProps: AppSidebarProps = {
