@@ -18,6 +18,7 @@ export default function MasterTingkatPage() {
   const [page, setPage] = React.useState(1)
   const [limit, setLimit] = React.useState(10)
   const [loading, setLoading] = React.useState(false)
+  const lastSigRef = React.useRef<string>("")
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -40,6 +41,10 @@ export default function MasterTingkatPage() {
   }, [search])
 
   React.useEffect(() => {
+    const sig = JSON.stringify({ debouncedSearch, sortBy, sortOrder, page, limit })
+    // Skip duplicate effect run in dev StrictMode by comparing signature
+    if (lastSigRef.current === sig) return
+    lastSigRef.current = sig
     fetchData()
   }, [debouncedSearch, sortBy, sortOrder, page, limit, fetchData])
   const handleSortClick = (key: string) => {

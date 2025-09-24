@@ -4,6 +4,7 @@ import Dashboard from './Dashboard'
 import AdminReports from './admin/AdminReports'
 import AdminUsers from './admin/AdminUsers'
 import MasterTingkatPage from './master/tingkat'
+import NotFound from './NotFound'
 
 export default function Admin() {
   return (
@@ -13,8 +14,8 @@ export default function Admin() {
         <Route path="reports" element={<AdminReports />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="master/tingkat" element={<MasterTingkatPage />} />
-        {/* Alias to support BE key-style path if provided directly */}
-        <Route path="master_tingkat" element={<MasterTingkatPage />} />
+        {/* Catch-all for unknown admin routes -> 404 */}
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   )
