@@ -44,7 +44,7 @@ export function PaginationBar({ total, page, limit, onPageChange, onLimitChange 
                 type="button"
                 className={
                   `h-7 px-2 text-xs rounded-sm transition-colors ${
-                    n === limit ? 'bg-primary text-primary-foreground' : 'hover:bg-accent hover:text-accent-foreground'
+                    n === limit ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'hover:bg-emerald-50 hover:text-emerald-800'
                   }`
                 }
                 onClick={() => onLimitChange?.(n)}
@@ -71,7 +71,7 @@ export function PaginationBar({ total, page, limit, onPageChange, onLimitChange 
               type="button"
               className={
                 `h-7 px-2 text-xs rounded-sm transition-colors ${
-                  n === limit ? 'bg-primary text-primary-foreground' : 'hover:bg-accent hover:text-accent-foreground'
+                  n === limit ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'hover:bg-emerald-50 hover:text-emerald-800'
                 }`
               }
               onClick={() => onLimitChange?.(n)}
@@ -91,7 +91,10 @@ export function PaginationBar({ total, page, limit, onPageChange, onLimitChange 
               {p === '...'
                 ? <PaginationEllipsis />
                 : (
-                  <PaginationLink isActive={p === page} onClick={() => onPageChange?.(p as number)}>
+                  <PaginationLink 
+                    className={p === page ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : ''}
+                    onClick={() => onPageChange?.(p as number)}
+                  >
                     {p}
                   </PaginationLink>
                 )}

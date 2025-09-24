@@ -61,7 +61,7 @@ function createAxios(): AxiosInstance {
   let isRefreshing = false
   let refreshSubscribers: Array<() => void> = []
 
-  // Function to handle token refresh
+  // Function to handle token refresh with better error handling
   const refreshAccessToken = async (): Promise<void> => {
     const refreshToken = tokenStorage.refresh
     if (!refreshToken) {
@@ -69,15 +69,16 @@ function createAxios(): AxiosInstance {
     }
 
     try {
-      // Use only /api/auth/refresh endpoint
       const resp = await axios.post(
-        `${API_BASE_URL}/api/auth/refresh`, 
-        { refresh_token: refreshToken }, 
-        { 
-          headers: { 
+        `${API_BASE_URL}/api/auth/refresh`,
+        { refresh_token: refreshToken },
+        {
+          headers: {
             'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          } 
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-Refresh-Attempt': 'true' // Mark as refresh request
+          },
+          timeout: 10000 // 10 seconds timeout
         }
       )
 
@@ -95,22 +96,51 @@ function createAxios(): AxiosInstance {
         tokenStorage.refresh = newRefresh
       }
 
+      // Emit event that token was refreshed
+      window.dispatchEvent(new Event('auth:tokenRefreshed'))
+      
       return Promise.resolve()
-    } catch (error) {
+    } catch (error: unknown) {
+      const axiosError = error as {
+        response?: {
+          status: number;
+          data?: unknown;
+        };
+        request?: unknown;
+        message?: string;
+      };
       // Clear tokens on refresh failure
       tokenStorage.clear()
-      return Promise.reject(error)
+      
+      // Handle specific error cases
+      if (axiosError.response) {
+        // Server responded with error status code
+        if (axiosError.response.status === 401 || axiosError.response.status === 400) {
+          throw new Error('Your session has expired. Please log in again.')
+        }
+      } else if (axiosError.request) {
+        // Request was made but no response received
+        throw new Error('Unable to connect to the server. Please check your connection.')
+      }
+      
+      // Other errors
+      throw new Error('Failed to refresh session. Please log in again.')
     }
   }
 
-  // Response interceptor to handle 401 errors
+  // Response interceptor to handle 401 errors and token refresh
   instance.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
-      const originalRequest = error.config as (typeof error)['config'] & { _retry?: boolean }
+      const originalRequest = error.config as (typeof error)['config'] & { _retry?: boolean, _skipAuth?: boolean }
       
-      // If error is not 401 or is a retry, reject
-      if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
+      // Skip handling if this is a refresh request or already retried
+      if (originalRequest._skipAuth || !originalRequest || originalRequest._retry) {
+        return Promise.reject(error)
+      }
+
+      // Only handle 401 errors for unauthorized requests
+      if (error.response?.status !== 401) {
         return Promise.reject(error)
       }
 
@@ -126,6 +156,14 @@ function createAxios(): AxiosInstance {
         })
       }
 
+      // Check if we have a refresh token
+      if (!tokenStorage.refresh) {
+        // No refresh token available, force logout
+        tokenStorage.clear()
+        window.dispatchEvent(new Event('auth:logout'))
+        return Promise.reject(new Error('No refresh token available'))
+      }
+
       // Set retry flag and start refresh process
       originalRequest._retry = true
       isRefreshing = true
@@ -133,17 +171,31 @@ function createAxios(): AxiosInstance {
       try {
         await refreshAccessToken()
         
+        // Update the original request with new token
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${tokenStorage.access}`
+        }
+        
         // Retry all queued requests
         const subscribers = refreshSubscribers
         refreshSubscribers = []
+        
+        // Retry the original request with new token
+        const response = await instance(originalRequest)
+        
+        // Process any queued requests
         await Promise.all(subscribers.map(callback => callback()))
         
-        // Retry the original request
-        return instance(originalRequest)
-      } catch (refreshError) {
-        // Clear all pending requests on refresh error
+        return response
+      } catch (refreshError: unknown) {
+      const error = refreshError as Error;
+        // Clear tokens and force logout on refresh error
+        tokenStorage.clear()
+        window.dispatchEvent(new Event('auth:logout'))
+        
+        // Clear all pending requests
         refreshSubscribers = []
-        return Promise.reject(refreshError)
+        return Promise.reject(error instanceof Error ? error : new Error('Session expired. Please log in again.'))
       } finally {
         isRefreshing = false
       }
