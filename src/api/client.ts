@@ -23,11 +23,24 @@ export const tokenStorage = {
     if (token) localStorage.setItem('refreshToken', token)
     else localStorage.removeItem('refreshToken')
   },
+  // realm determines which refresh endpoint to use. Expected values: 'admin' | 'level'
+  get realm(): 'admin' | 'level' {
+    const v = localStorage.getItem('authRealm')
+    return v === 'level' ? 'level' : 'admin'
+  },
+  set realm(v: 'admin' | 'level') {
+    localStorage.setItem('authRealm', v)
+  },
   clear() {
     localStorage.removeItem('authToken')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userName')
+    localStorage.removeItem('authRealm')
   },
+}
+
+export function setAuthRealm(realm: 'admin' | 'level') {
+  tokenStorage.realm = realm
 }
 
 function createAxios(): AxiosInstance {
@@ -44,40 +57,96 @@ function createAxios(): AxiosInstance {
     return config
   })
 
-  // Refresh token on 401 once
+  // Refresh token state
   let isRefreshing = false
-  let pendingQueue: Array<() => void> = []
+  let refreshSubscribers: Array<() => void> = []
 
-  instance.interceptors.response.use(
-    (res) => res,
-    async (error: AxiosError) => {
-      const original = error.config as (typeof error)['config'] & { _retry?: boolean }
-      const status = error.response?.status
-      if (status === 401 && original && !original._retry) {
-        if (isRefreshing) {
-          // queue retry until refresh finished
-          await new Promise<void>((resolve) => pendingQueue.push(resolve))
-        } else {
-          original._retry = true
-          isRefreshing = true
-          try {
-            const refreshToken = tokenStorage.refresh
-            if (!refreshToken) throw new Error('No refresh token')
-            const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, { refresh_token: refreshToken }, { headers: { 'Content-Type': 'application/json' } })
-            const data = resp.data as Record<string, unknown>
-            const newAccess = (data['accessToken'] || data['token'] || data['access_token']) as string | undefined
-            if (!newAccess) throw new Error('No access token in refresh response')
-            tokenStorage.access = newAccess
-          } finally {
-            isRefreshing = false
-            pendingQueue.forEach((fn) => fn())
-            pendingQueue = []
-          }
+  // Function to handle token refresh
+  const refreshAccessToken = async (): Promise<void> => {
+    const refreshToken = tokenStorage.refresh
+    if (!refreshToken) {
+      throw new Error('No refresh token available')
+    }
+
+    try {
+      // Use only /api/auth/refresh endpoint
+      const resp = await axios.post(
+        `${API_BASE_URL}/api/auth/refresh`, 
+        { refresh_token: refreshToken }, 
+        { 
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          } 
         }
-        // retry original request with new token
-        return instance(original)
+      )
+
+      const data = resp.data as Record<string, unknown>
+      const newAccess = (data['accessToken'] || data['token'] || data['access_token']) as string | undefined
+      const newRefresh = (data['refresh_token'] || data['refreshToken']) as string | undefined
+      
+      if (!newAccess) {
+        throw new Error('No access token in refresh response')
       }
+
+      // Update tokens
+      tokenStorage.access = newAccess
+      if (newRefresh) {
+        tokenStorage.refresh = newRefresh
+      }
+
+      return Promise.resolve()
+    } catch (error) {
+      // Clear tokens on refresh failure
+      tokenStorage.clear()
       return Promise.reject(error)
+    }
+  }
+
+  // Response interceptor to handle 401 errors
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error: AxiosError) => {
+      const originalRequest = error.config as (typeof error)['config'] & { _retry?: boolean }
+      
+      // If error is not 401 or is a retry, reject
+      if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
+        return Promise.reject(error)
+      }
+
+      // If we're already refreshing, add to queue
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshSubscribers.push(() => {
+            // Clone the original request with new token
+            instance(originalRequest)
+              .then(resolve)
+              .catch(reject)
+          })
+        })
+      }
+
+      // Set retry flag and start refresh process
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        await refreshAccessToken()
+        
+        // Retry all queued requests
+        const subscribers = refreshSubscribers
+        refreshSubscribers = []
+        await Promise.all(subscribers.map(callback => callback()))
+        
+        // Retry the original request
+        return instance(originalRequest)
+      } catch (refreshError) {
+        // Clear all pending requests on refresh error
+        refreshSubscribers = []
+        return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
+      }
     }
   )
 

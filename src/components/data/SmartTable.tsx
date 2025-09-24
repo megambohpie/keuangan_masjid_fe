@@ -16,10 +16,12 @@ export type SmartTableProps<T> = {
   sortBy?: string
   sortOrder?: 'ASC' | 'DESC'
   onSortChange?: (key: string) => void
+  onRowClick?: (row: T) => void
   loading?: boolean
   emptyMessage?: string
   headerClassName?: string
   striped?: boolean
+  rowClassName?: string | ((row: T) => string)
 }
 
 export function SmartTable<T extends Record<string, unknown>>({
@@ -30,8 +32,10 @@ export function SmartTable<T extends Record<string, unknown>>({
   onSortChange,
   loading = false,
   emptyMessage = 'Data tidak ditemukan',
+  onRowClick,
   headerClassName,
   striped = true,
+  rowClassName,
 }: SmartTableProps<T>) {
   const handleSort = (key: string, sortable?: boolean) => {
     if (!sortable || !onSortChange) return
@@ -75,8 +79,21 @@ export function SmartTable<T extends Record<string, unknown>>({
               </TableCell>
             </TableRow>
           )}
-          {!loading && data.map((row, idx) => (
-            <TableRow key={idx} className={striped ? 'odd:bg-white even:bg-muted/40' : undefined}>
+          {!loading && data.map((row, idx) => {
+            const rowClass = typeof rowClassName === 'function' 
+              ? rowClassName(row)
+              : rowClassName
+            
+            return (
+              <TableRow 
+                key={idx} 
+                className={cn(
+                  striped ? 'odd:bg-white even:bg-muted/40' : undefined,
+                  onRowClick && 'cursor-pointer hover:bg-muted/60 transition-colors',
+                  rowClass
+                )}
+                onClick={() => onRowClick?.(row)}
+              >
               {columns.map((c) => {
                 const k = String(c.key)
                 const content = c.render
@@ -91,8 +108,9 @@ export function SmartTable<T extends Record<string, unknown>>({
                   </TableCell>
                 )
               })}
-            </TableRow>
-          ))}
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

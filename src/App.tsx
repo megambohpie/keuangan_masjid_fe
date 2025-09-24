@@ -10,13 +10,10 @@ function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
 
-      <Route
-        path="/dashboard"
-        element={<Navigate to="/admin" replace />}
-      />
+      <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
       <Route
-        path="/admin/*"
+        path="/*"
         element={
           <PrivateRoute>
             <Admin />
