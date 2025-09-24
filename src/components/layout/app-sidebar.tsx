@@ -37,7 +37,9 @@ function toKebab(s: string) {
 
 function buildPathFromKey(key: string) {
   if (key === 'dashboard' || key === 'home') return '/admin'
-  return `/admin/${toKebab(key)}`
+  // Map underscores to nested paths: e.g., master_tingkat -> /admin/master/tingkat
+  const segments = key.split('_').map((s) => toKebab(s))
+  return `/admin/${segments.join('/')}`
 }
 
 function mapApiNodeToItem(node: ApiMenuNode): SidebarItem {
@@ -45,7 +47,16 @@ function mapApiNodeToItem(node: ApiMenuNode): SidebarItem {
   const label: string = node.name || node.label || key
   const iconName = node.icon
   const icon = undefined
-  const path: string = node.path || buildPathFromKey(key)
+  let path: string = node.path || buildPathFromKey(key)
+  // Normalize path from BE to always live under /admin
+  if (path) {
+    if (!path.startsWith('/')) {
+      path = `/${path}`
+    }
+    if (!path.startsWith('/admin')) {
+      path = `/admin${path}`
+    }
+  }
   const children: SidebarItem[] | undefined = Array.isArray(node.children)
     ? node.children.map((c: ApiMenuNode) => mapApiNodeToItem(c))
     : undefined
