@@ -12,8 +12,9 @@ export default function AdminLayout() {
   }
 
   const headerProps: AppHeaderProps = {
-    title: 'Keuangan Masjid',
+    title: '',
     onLogout: onLogout,
+    userName: (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Admin',
   }
 
   const sidebarProps: AppSidebarProps = {
@@ -22,10 +23,12 @@ export default function AdminLayout() {
 
   return (
     <AppShell headerProps={headerProps} sidebarProps={sidebarProps}>
-      <Outlet />
-      <footer className="mt-10 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Keuangan Masjid. Dibuat dengan Tailwind + shadcn/ui.
-      </footer>
+      <div className="min-h-full flex flex-col">
+        <Outlet />
+        <footer className="mt-auto pt-6 text-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Keuangan Masjid. Dibuat dengan Tailwind + shadcn/ui.
+        </footer>
+      </div>
     </AppShell>
   )
 }

@@ -25,6 +25,9 @@ export default function Login() {
 
       // Simple auth: set a dummy token
       localStorage.setItem('authToken', 'dummy-token')
+      // Save user name for header display
+      const guessedName = email?.split('@')[0] || 'Admin'
+      localStorage.setItem('userName', guessedName)
 
       // Navigate to intended route or admin shell (so header/sidebar appear)
       const redirectTo = location.state?.from?.pathname ?? '/admin'

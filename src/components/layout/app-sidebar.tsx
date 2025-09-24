@@ -25,11 +25,8 @@ export default function AppSidebar({ items = sampleMenu, footer, collapsed = fal
   const Menu = (
     <>
       {/* Brand */}
-      <div className={cn("h-16 px-4 border-b flex items-center", collapsed && "justify-center px-0")}>
-        <div className="text-xl font-bold text-primary">S.</div>
-        {!collapsed && (
-          <div className="ml-2 text-xs text-muted-foreground">Modern Admin Dashboard</div>
-        )}
+      <div className={cn("h-16 px-4 border-b flex items-center", collapsed && "justify-center px-0")}>        
+        <div className="text-xl font-bold text-primary">{collapsed ? 'KM' : 'Keuangan Masjid'}</div>
       </div>
 
       {/* Menu */}
@@ -75,7 +72,7 @@ export default function AppSidebar({ items = sampleMenu, footer, collapsed = fal
     <>
       {/* Desktop sidebar */}
       <aside className={cn(
-        "hidden lg:flex shrink-0 flex-col border-r bg-card/60 backdrop-blur-sm transition-[width] duration-200",
+        "hidden lg:flex shrink-0 flex-col border-r bg-islamic-50/90 shadow-sm backdrop-blur-sm transition-[width] duration-200",
         collapsed ? "w-16" : "w-72"
       )}>
         {Menu}
@@ -85,7 +82,7 @@ export default function AppSidebar({ items = sampleMenu, footer, collapsed = fal
       {mobileOpen && (
         <div className="lg:hidden">
           <div className="fixed inset-0 z-40 bg-black/30" onClick={onCloseMobile} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-card border-r shadow-xl flex flex-col">
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-islamic-50 border-r shadow-xl flex flex-col">
             {/* Close area/header */}
             <div className="h-16 px-4 border-b flex items-center justify-between">
               <div className="text-lg font-semibold text-primary">Menu</div>
