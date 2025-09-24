@@ -1,12 +1,13 @@
-// Lightweight API client with token storage and auto-refresh support
+// Axios-based API client with interceptors
 // Usage: import { apiClient, tokenStorage } from '@/api/client'
+
+import axios from 'axios'
+import type { AxiosError, AxiosInstance } from 'axios'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-// Read base URL from Vite env
 const API_BASE_URL: string = (import.meta as ImportMeta).env.VITE_API_BASE_URL ?? 'http://localhost:3000'
 
-// Local token storage helpers
 export const tokenStorage = {
   get access() {
     return localStorage.getItem('authToken') || null
@@ -29,83 +30,84 @@ export const tokenStorage = {
   },
 }
 
+function createAxios(): AxiosInstance {
+  const instance = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type': 'application/json' } })
+
+  // Attach Authorization header
+  instance.interceptors.request.use((config) => {
+    const skipAuth = (config as unknown as { skipAuth?: boolean }).skipAuth
+    const token = tokenStorage.access
+    if (!skipAuth && token) {
+      config.headers = config.headers ?? {}
+      ;(config.headers as Record<string, string>).Authorization = `Bearer ${token}`
+    }
+    return config
+  })
+
+  // Refresh token on 401 once
+  let isRefreshing = false
+  let pendingQueue: Array<() => void> = []
+
+  instance.interceptors.response.use(
+    (res) => res,
+    async (error: AxiosError) => {
+      const original = error.config as (typeof error)['config'] & { _retry?: boolean }
+      const status = error.response?.status
+      if (status === 401 && original && !original._retry) {
+        if (isRefreshing) {
+          // queue retry until refresh finished
+          await new Promise<void>((resolve) => pendingQueue.push(resolve))
+        } else {
+          original._retry = true
+          isRefreshing = true
+          try {
+            const refreshToken = tokenStorage.refresh
+            if (!refreshToken) throw new Error('No refresh token')
+            const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, { refresh_token: refreshToken }, { headers: { 'Content-Type': 'application/json' } })
+            const data = resp.data as Record<string, unknown>
+            const newAccess = (data['accessToken'] || data['token'] || data['access_token']) as string | undefined
+            if (!newAccess) throw new Error('No access token in refresh response')
+            tokenStorage.access = newAccess
+          } finally {
+            isRefreshing = false
+            pendingQueue.forEach((fn) => fn())
+            pendingQueue = []
+          }
+        }
+        // retry original request with new token
+        return instance(original)
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  return instance
+}
+
+const axiosInstance = createAxios()
+
 export interface RequestOptions<TBody = unknown> {
   method?: HttpMethod
   path: string
   body?: TBody
   headers?: Record<string, string>
-  // When true, will try to refresh token once on 401 and retry request
-  tryRefresh?: boolean
-}
-
-async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = tokenStorage.refresh
-  if (!refreshToken) return false
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
-    if (!res.ok) return false
-    const data = await res.json()
-    const newAccess = data.accessToken || data.token || data.access_token
-    if (typeof newAccess === 'string' && newAccess.length > 0) {
-      tokenStorage.access = newAccess
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
+  // when true, do not attach Authorization header
+  skipAuth?: boolean
 }
 
 export const apiClient = {
   baseUrl: API_BASE_URL,
 
   async request<TResponse = unknown, TBody = unknown>(opts: RequestOptions<TBody>): Promise<TResponse> {
-    const { method = 'GET', path, body, headers = {}, tryRefresh = true } = opts
-
-    const doFetch = async (): Promise<Response> => {
-      const h: Record<string, string> = { 'Content-Type': 'application/json', ...headers }
-      const token = tokenStorage.access
-      if (token) h.Authorization = `Bearer ${token}`
-      return fetch(`${API_BASE_URL}${path}`, {
-        method,
-        headers: h,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      })
-    }
-
-    let res = await doFetch()
-
-    if (res.status === 401 && tryRefresh) {
-      const refreshed = await refreshAccessToken()
-      if (refreshed) {
-        res = await doFetch()
-      }
-    }
-
-    if (!res.ok) {
-      let message = `HTTP ${res.status}`
-      try {
-        const data = await res.json()
-        if (data?.message) message = data.message
-      } catch {
-        // ignore json errors
-      }
-      throw new Error(message)
-    }
-
-    // parse json
-    return (await res.json()) as TResponse
+    const { method = 'GET', path, body, headers, skipAuth } = opts
+    const res = await axiosInstance.request<TResponse>({ url: path, method, data: body, headers, ...(skipAuth ? { skipAuth: true } : {}) })
+    return res.data
   },
 
-  get<T = unknown>(path: string, headers?: Record<string, string>) {
-    return this.request<T>({ method: 'GET', path, headers })
+  get<T = unknown>(path: string, headers?: Record<string, string>, opts?: { skipAuth?: boolean }) {
+    return this.request<T>({ method: 'GET', path, headers, skipAuth: opts?.skipAuth })
   },
-  post<T = unknown, B = unknown>(path: string, body?: B, headers?: Record<string, string>, tryRefresh = false) {
-    // For auth endpoints (login/refresh/logout) we usually skip refresh logic
-    return this.request<T, B>({ method: 'POST', path, body, headers, tryRefresh })
+  post<T = unknown, B = unknown>(path: string, body?: B, headers?: Record<string, string>, opts?: { skipAuth?: boolean }) {
+    return this.request<T, B>({ method: 'POST', path, body, headers, skipAuth: opts?.skipAuth })
   },
 }

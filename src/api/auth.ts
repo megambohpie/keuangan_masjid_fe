@@ -86,7 +86,7 @@ export async function login(payload: LoginPayload) {
     "/api/users/login",
     payload,
     undefined,
-    false
+    { skipAuth: true }
   )
   // Try multiple common shapes (top-level or nested under data)
   const access = pickToken(data, ["accessToken", "token", "access_token"]) 
@@ -114,7 +114,7 @@ export async function logout() {
         "/api/auth/logout",
         { refresh_token: refresh },
         undefined,
-        false
+        { skipAuth: true }
       )
     }
   } finally {
@@ -129,7 +129,7 @@ export async function refreshToken() {
     "/api/auth/refresh",
     { refresh_token: refresh },
     undefined,
-    false
+    { skipAuth: true }
   )
   const access = data.accessToken || data.token || data.access_token
   if (!access) throw new Error("Refresh failed: no access token in response")
