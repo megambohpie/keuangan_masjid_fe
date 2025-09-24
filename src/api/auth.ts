@@ -64,6 +64,23 @@ export function extractUserName(source: unknown): string | undefined {
   return undefined
 }
 
+function extractMenus(source: unknown): { flat?: unknown[]; tree?: unknown[] } | undefined {
+  if (!source || typeof source !== 'object') return undefined
+  const obj = source as Record<string, unknown>
+  const dataAny = obj['data']
+  const fromTop = obj['menus']
+  const tryObj = (v: unknown) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined)
+
+  // Prefer nested under data.menus
+  const dataObj = tryObj(dataAny)
+  const menusObj = tryObj(dataObj?.menus ?? fromTop)
+  if (!menusObj) return undefined
+  const flat = Array.isArray(menusObj.flat) ? (menusObj.flat as unknown[]) : undefined
+  const tree = Array.isArray(menusObj.tree) ? (menusObj.tree as unknown[]) : undefined
+  if (flat || tree) return { flat, tree }
+  return undefined
+}
+
 export async function login(payload: LoginPayload) {
   const data = await apiClient.post<LoginResponse, LoginPayload>(
     "/api/users/login",
@@ -77,6 +94,15 @@ export async function login(payload: LoginPayload) {
 
   if (access) tokenStorage.access = access
   if (refresh) tokenStorage.refresh = refresh
+  // Save menus if provided by API: data.menus.flat / data.menus.tree
+  const menus = extractMenus(data)
+  if (menus) {
+    try {
+      localStorage.setItem('menus', JSON.stringify(menus))
+    } catch {
+      // ignore quota errors
+    }
+  }
   return data
 }
 

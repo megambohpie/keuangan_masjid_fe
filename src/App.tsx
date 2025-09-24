@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import PrivateRoute from './routes/PrivateRoute'
+import NotFound from './pages/NotFound'
 
 function App() {
   return (
@@ -23,7 +24,7 @@ function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
